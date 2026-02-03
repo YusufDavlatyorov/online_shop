@@ -41,6 +41,7 @@ class Wait(StatesGroup):
     wait_for_product_stock=State()
     wait_for_product_desc=State()
     wait_for_product_quantity=State()
+    wait_for_address=State()
 
 
 @dp.message(filters.Command('add_category'))
@@ -136,9 +137,9 @@ async def regis(message: Message):
         card = Cart(user_id=us.id)
         session.add(card)
         session.commit()
-        await message.answer("✅ Hello, welcome to our online store.\nUse <b>-option-</b> to continue.", parse_mode="HTML")
+        await message.answer("✅ Hello, welcome to our online store.\n", parse_mode="HTML")
     else:
-        await message.answer(f"👋 Welcome back, {user.name}!\nUse <b>-option-</b> to continue.", parse_mode="HTML")
+        await message.answer(f"👋 Welcome back, {user.name}!\n", parse_mode="HTML")
 
     
     markup = ReplyKeyboardMarkup(
@@ -171,6 +172,7 @@ async def category(message: Message):
     markup = InlineKeyboardMarkup(inline_keyboard=buttons)
     await message.answer("📂 Choose a category:", reply_markup=markup)
     
+    
 
 @dp.callback_query(F.data.startswith('cat_'))
 async def show_products(call: CallbackQuery):
@@ -190,6 +192,11 @@ async def show_products(call: CallbackQuery):
             reply_markup=markup,
             parse_mode="HTML"
         )
+        await call.message.answer('To add this product to your cart tap it')
+        await call.message.edit_reply_markup(reply_markup=None)
+
+
+
     await call.answer()
     
 @dp.callback_query(F.data.startswith('prod_'))
@@ -208,7 +215,7 @@ async def add_to_cart(call: CallbackQuery):
         session.commit()
         await call.message.answer("✅ Product added to your cart", parse_mode="HTML")
 
-
+    
     await call.message.edit_reply_markup(reply_markup=None)
     await call.answer()
     
@@ -247,6 +254,8 @@ async def order_or_delete(call:CallbackQuery):
         ]
     )
     await call.message.answer('What do you want do with this product', reply_markup=markup)
+    await call.message.edit_reply_markup(reply_markup=None)
+
     await call.answer()
 
 @dp.callback_query(F.data.startswith('delete_'))
@@ -262,6 +271,7 @@ async def delete_from_cart(call: CallbackQuery):
     session.commit()
     await call.message.edit_reply_markup(reply_markup=None)
     await call.message.answer("🗑 Product deleted from cart", parse_mode="HTML")
+    await call.message.delete()
     await call.answer()
 
 @dp.callback_query(F.data.startswith('order_'))
@@ -281,9 +291,16 @@ async def order_from_cart(message: Message, state: FSMContext):
     except ValueError:
         await message.answer("❌ Enter a valid number greater than 0")
         return
+    await state.update_data(quantity=qty)
+    await message.answer('Enter your delivery address')
+    await state.set_state(Wait.wait_for_address)
 
+@dp.message(Wait.wait_for_address)
+async def order_from_cart(message: Message, state: FSMContext):
     data = await state.get_data()
     cart_item_id = data['cart_item_id']
+    quantity=data['quantity']
+    address=message.text.strip()
     cart_item = session.query(CartItems).filter_by(id=cart_item_id).first()
     if not cart_item:
         await message.answer("❌ Cart product not found")
@@ -293,24 +310,35 @@ async def order_from_cart(message: Message, state: FSMContext):
     cart = session.query(Cart).filter_by(id=cart_item.cart_id).first()
     user = session.query(Users).filter_by(id=cart.user_id).first()
     product = session.query(Products).filter_by(id=cart_item.product_id).first()
-    total = product.price * qty
+    total = product.price * quantity
 
-    order = Order(user_id=user.id, total_price=total)
+    order = Order(user_id=user.id, total_price=total,address=address)
     session.add(order)
     session.commit()
 
-    order_item = OrderItems(order_id=order.id, product_id=product.id, quantity=qty)
+    order_item = OrderItems(order_id=order.id, product_id=product.id, quantity=quantity)
     session.add(order_item)
     session.delete(cart_item)
     session.commit()
 
-    await message.answer(f"✅ Order created!\n<b>Product:</b> {product.title}\n<b>Quantity:</b> {qty}\n<b>Total:</b> {total}", parse_mode="HTML")
+    await message.answer(f"✅ Order created!\n<"
+                         f"b>Product:</b> {product.title}\n"
+                         f"<b>Quantity:</b> {quantity}\n"
+                         f"<b>Delivery to:</b> {address}\n"
+                         f"<b>Will be deliver in 3 days</b>zn"
+                          f"<b>Total:</b> {total}", 
+                          parse_mode="HTML")
 
     await message.bot.send_message(
         chat_id=admin,
-        text=(f"🛒 New order!\n<b>User:</b> {user.name}\n<b>Product:</b> {product.title}\n<b>Quantity:</b> {qty}\n<b>Total:</b> {total}"),
-        parse_mode="HTML"
-    )
+        text=f"🛒 New order!\n"
+        f"<b>User:</b> {user.name}\n"
+        f"<b>Product:</b> {product.title}\n"
+        f"<b>Quantity:</b> {quantity}\n"
+        f"<b>Total:</b> {total}\n"
+        f"<b>Address:</b> {address}"
+        f"<b>Will be deliver in 3 days</b>",
+        parse_mode="HTML")
     await state.clear()
 
 # @dp.message(F.text=='Contacts')
