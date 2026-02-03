@@ -1,7 +1,7 @@
 from aiogram import filters, Dispatcher,Bot,F
 from aiogram.types import(
     InlineKeyboardMarkup,InlineKeyboardButton,ReplyKeyboardMarkup,KeyboardButton,
-    CallbackQuery,Message,BotCommand,FSInputFile
+    CallbackQuery,Message,BotCommand,FSInputFile,ContentType
 )
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State,StatesGroup
@@ -9,6 +9,7 @@ from db import Users,Categories,Products,Cart,CartItems,Order,OrderItems,engine
 from sqlalchemy.orm import sessionmaker
 Session=sessionmaker(bind=engine)
 session=Session()
+from datetime import datetime, timedelta
 import asyncio
 from dotenv import load_dotenv
 import os
@@ -113,9 +114,12 @@ async def add_category(message: Message, state: FSMContext):
     await message.answer("🖼 Enter photo URL:")
     await state.set_state(Wait.wait_for_product_photo)
 
-@dp.message(Wait.wait_for_product_photo)
+@dp.message(Wait.wait_for_product_photo, filters.StateFilter(Wait.wait_for_product_photo, F.photo))
+#baroe ki surat kabul kna
 async def add_photo(message: Message, state: FSMContext):
-    await state.update_data(photo=message.text.strip())
+    photo=message.photo[-1]
+    file_id=photo.file_id
+    await state.update_data(photo=file_id)
     await message.answer('Enter a stock')
     await state.set_state(Wait.wait_for_product_stock)
 
@@ -156,7 +160,8 @@ async def regis(message: Message):
     markup = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="Category")],
-            [KeyboardButton(text="Contacts"), KeyboardButton(text="My cart")]
+            [KeyboardButton(text="Contacts"), KeyboardButton(text="My cart")],
+            [KeyboardButton(text="New")]
         ],
         resize_keyboard=True
     )
@@ -167,11 +172,34 @@ async def choice(message: Message):
     markup = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="Category")],
-            [KeyboardButton(text="Contacts"), KeyboardButton(text="My cart")]
+            [KeyboardButton(text="Contacts"), KeyboardButton(text="My cart")],
+            [KeyboardButton(text="New")]
         ],
         resize_keyboard=True
     )
     await message.answer("🛒 Choose an option:", reply_markup=markup)
+
+
+@dp.message(F.text=="New")
+async def new(message:Message):
+    time=datetime.now()-timedelta(hours=2)
+    product=session.query(Products).filter(Products.created_at>=time)
+    if not product:
+        await message.answer('Not products in last time as new')
+    for p in product:
+        markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text='Add to cart', callback_data=f'prod_{p.id}')]
+            ]
+        )
+        await message.answer_photo(
+            photo=p.photo_url,
+            caption=f'<b>{p.title}</b>\n price:<b>{p.price}</b>description:<b>\n{p.description}</b>',
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+    session.close()
+
 
 @dp.message(F.text=='Category')
 async def category(message: Message):

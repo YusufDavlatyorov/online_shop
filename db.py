@@ -31,6 +31,7 @@ class Products(Base):
     photo_url=Column(String(300))
     stock=Column(Integer)
     category_id=Column(Integer,ForeignKey('categories.id'))
+    created_at=Column(DateTime, default=datetime.now())
 
 class Cart(Base):
     __tablename__='carts'
