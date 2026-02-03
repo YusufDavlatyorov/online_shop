@@ -63,6 +63,7 @@ class OrderItems(Base):
     order_id=Column(ForeignKey('orders.id', ondelete='cascade'))
     product_id=Column(ForeignKey('products.id', ondelete='cascade'))
     quantity=Column(Integer, nullable=False)
+    size=Column(String(250))
 
 
 

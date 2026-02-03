@@ -43,6 +43,7 @@ class Wait(StatesGroup):
     wait_for_product_desc=State()
     wait_for_product_quantity=State()
     wait_for_address=State()
+    wait_for_size=State()
     
 
 
@@ -331,14 +332,22 @@ async def order_from_cart(message: Message, state: FSMContext):
         await message.answer("❌ Enter a valid number greater than 0")
         return
     await state.update_data(quantity=qty)
+    await message.answer('Enter your size(if this thing dont have size put just '-'.For instance books dont have size)')
+    await state.set_state(Wait.wait_for_size)
+
+@dp.message(Wait.wait_for_size)
+async def get_size(message:Message, state:FSMContext):
+    await state.update_data(size=message.text.strip())
     await message.answer('Enter your delivery address')
     await state.set_state(Wait.wait_for_address)
+
 
 @dp.message(Wait.wait_for_address)
 async def order_from_cart(message: Message, state: FSMContext):
     data = await state.get_data()
     cart_item_id = data['cart_item_id']
     quantity=data['quantity']
+    size=data['size']
     address=message.text.strip()
     cart_item = session.query(CartItems).filter_by(id=cart_item_id).first()
     if not cart_item:
@@ -360,7 +369,7 @@ async def order_from_cart(message: Message, state: FSMContext):
     session.add(order)
     session.commit()
 
-    order_item = OrderItems(order_id=order.id, product_id=product.id, quantity=quantity)
+    order_item = OrderItems(order_id=order.id, product_id=product.id, quantity=quantity,size=size)
     session.add(order_item)
     product.stock=max(product.stock-quantity, 0)
     session.delete(cart_item)
@@ -371,6 +380,7 @@ async def order_from_cart(message: Message, state: FSMContext):
                          f"<b>Quantity:</b> {quantity}\n"
                          f"<b>Delivery to:</b> {address}\n"
                          f"<b>Will be deliver in 3 days</b>\n"
+                         f"<b>Your size:{size}</b>\n"
                           f"<b>Total:</b> {total}", 
                           parse_mode="HTML")
 
@@ -381,7 +391,8 @@ async def order_from_cart(message: Message, state: FSMContext):
         f"<b>Product:</b> {product.title}\n"
         f"<b>Quantity:</b> {quantity}\n"
         f"<b>Total:</b> {total}\n"
-        f"<b>Address:</b> {address}"
+        f"<b>Address:</b> {address}\n"
+        f"<b>Your size:{size}</b>\n"
         f"<b>Will be deliver in 3 days</b>",
         parse_mode="HTML")
     await state.clear()
