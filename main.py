@@ -31,6 +31,7 @@ comand=[
     BotCommand(command='option', description='oportunaties of bot'),
     BotCommand(command='add_category', description='adding any new category'),
     BotCommand(command='add_product', description='adding any product'),
+    
 ]
 
 class Wait(StatesGroup):
@@ -397,6 +398,15 @@ async def order_from_cart(message: Message, state: FSMContext):
         parse_mode="HTML")
     await state.clear()
 
+
+
+
+
+    
+
+
+
+
 @dp.message(F.text=='Contacts')
 async def contacts(message: Message):
     await message.answer("📞 Our numbers:\n+992711111111\n+992006909090\n+992071717171")
@@ -421,6 +431,9 @@ async def ai_chat(message:Message):
 
     ai_answer = response.choices[0].message.content
     await message.answer(ai_answer)
+
+
+
 
 
 async def main():
