@@ -42,6 +42,7 @@ class Wait(StatesGroup):
     wait_for_product_desc=State()
     wait_for_product_quantity=State()
     wait_for_address=State()
+    
 
 
 @dp.message(filters.Command('add_category'))
@@ -111,16 +112,26 @@ async def add_category(message: Message, state: FSMContext):
     await state.update_data(category_id=category.id)
     await message.answer("🖼 Enter photo URL:")
     await state.set_state(Wait.wait_for_product_photo)
+
 @dp.message(Wait.wait_for_product_photo)
 async def add_photo(message: Message, state: FSMContext):
     await state.update_data(photo=message.text.strip())
+    await message.answer('Enter a stock')
+    await state.set_state(Wait.wait_for_product_stock)
+
+
+
+@dp.message(Wait.wait_for_product_stock)
+async def add_photo(message: Message, state: FSMContext):
+    await state.update_data(stock=message.text.strip())
     data = await state.get_data()
     product = Products(
         title=data['title'],
         description=data['description'],
         price=data['price'],
         category_id=data['category_id'],
-        photo_url=data['photo']
+        photo_url=data['photo'],
+        stock=data['stock']
     )
     session.add(product)
     session.commit()
@@ -307,9 +318,14 @@ async def order_from_cart(message: Message, state: FSMContext):
         await state.clear()
         return
 
+    product = session.query(Products).filter_by(id=cart_item.product_id).first()
+    if product.stock < quantity:
+        await message.answer(f'Unfortunatully you cant order this quantity max is {product.stock}')
+        await state.clear()
+        return
+
     cart = session.query(Cart).filter_by(id=cart_item.cart_id).first()
     user = session.query(Users).filter_by(id=cart.user_id).first()
-    product = session.query(Products).filter_by(id=cart_item.product_id).first()
     total = product.price * quantity
 
     order = Order(user_id=user.id, total_price=total,address=address)
@@ -318,6 +334,7 @@ async def order_from_cart(message: Message, state: FSMContext):
 
     order_item = OrderItems(order_id=order.id, product_id=product.id, quantity=quantity)
     session.add(order_item)
+    product.stock=max(product.stock-quantity, 0)
     session.delete(cart_item)
     session.commit()
 
@@ -325,7 +342,7 @@ async def order_from_cart(message: Message, state: FSMContext):
                          f"b>Product:</b> {product.title}\n"
                          f"<b>Quantity:</b> {quantity}\n"
                          f"<b>Delivery to:</b> {address}\n"
-                         f"<b>Will be deliver in 3 days</b>zn"
+                         f"<b>Will be deliver in 3 days</b>\n"
                           f"<b>Total:</b> {total}", 
                           parse_mode="HTML")
 
