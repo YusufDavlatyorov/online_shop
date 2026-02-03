@@ -386,14 +386,14 @@ async def order_from_cart(message: Message, state: FSMContext):
         parse_mode="HTML")
     await state.clear()
 
-# @dp.message(F.text=='Contacts')
-# async def contacts(message: Message):
-#     await message.answer("📞 Our numbers:\n+992711111111\n+992006909090\n+992071717171")
-
-
-
-
 @dp.message(F.text=='Contacts')
+async def contacts(message: Message):
+    await message.answer("📞 Our numbers:\n+992711111111\n+992006909090\n+992071717171")
+
+
+
+from promt import promt
+@dp.message()
 async def ai_chat(message:Message):
     user_text=message.text
     print(user_text)
@@ -401,7 +401,7 @@ async def ai_chat(message:Message):
     response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": 'you must answer in tajik about our shop. our shop is big shop with a lot of category and products'},
+                {"role": "system", "content": promt},
                 {"role": "user", "content": user_text}
             ],
             temperature=0.7,
